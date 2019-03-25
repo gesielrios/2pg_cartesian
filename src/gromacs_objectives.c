@@ -1,50 +1,25 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <math.h>
+#include "gromacs_objectives.h"
+#include "defines.h"
+#include "messages.h"
+#include "futil.h"
+#include "consts.h"
+#include "string_owner.h"
+#include "osutil.h"
+#include "parameters_type.h"
+#include "protein_type.h"
+#include "pdbio.h"
+
 #ifdef _WIN32
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <math.h>
-#include "gromacs_objectives.h"
-#include "defines.h"
-#include "messages.h"
-#include "futil.h"
-#include "consts.h"
-#include "string_owner.h"
-#include "osutil.h"
-#include "parameters_type.h"
-#include "protein_type.h"
-#include "pdbio.h"
-#include <float.h>
+	#include <float.h>
 #endif
-
-#ifdef linux
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <math.h>
-#include "gromacs_objectives.h"
-#include "defines.h"
-#include "messages.h"
-#include "futil.h"
-#include "consts.h"
-#include "string_owner.h"
-#include "osutil.h"
-#include "parameters_type.h"
-#include "protein_type.h"
-#include "pdbio.h"
-#endif
-
 
 #define TAM_LINE_ENER 50
 #define MAX_ENERGY 9999999999999999999999999.9999
@@ -107,7 +82,7 @@ static double *g_sas_values = NULL;
 
 //It is based on GROMACS version 4.6.5
 #ifdef _WIN32
-static option_fitness_gromacs_t option_g_energy_program [] = {
+	static option_fitness_gromacs_t option_g_energy_program [] = {
       		                                                  {gmx_potential_ener, "11","Potential"},
       		                                                  {gmx_edw_ener,"7","LJ-14"},
       		                                                  {gmx_elel_ener,"8","Coulomb-14"},
@@ -124,10 +99,8 @@ static option_fitness_gromacs_t option_g_energy_program [] = {
       		                                                  {gmx_stride_helix,"-1","Stride_helix"},
       		                                                  {gmx_stride_beta,"-1","Stride_beta"}
                                                              };
-#endif
-
-#ifdef linux
-static option_fitness_gromacs_t option_g_energy_program [] = {
+#else
+	static option_fitness_gromacs_t option_g_energy_program [] = {
       		                                                  {gmx_potential_ener, "11","Potential"},
       		                                                  {gmx_edw_ener,"7","LJ-14"},
       		                                                  {gmx_elel_ener,"8","Coulomb-14"},
@@ -216,163 +189,163 @@ static inline int run_program_after_pipe(const char *pipe_msg, const char *file,
  * where:
  * argv_list[i] = argsi (argsi is in the format expected by execv(3))
  */
-#ifdef linux
+#ifdef __unix__
 
-static inline int run_program(const char *file, char *const argv[]){
-	int out, err; /* file descriptors for stdout and stderr */
-	int i = 0;
+	static inline int run_program(const char *file, char *const argv[]){
+		int out, err; /* file descriptors for stdout and stderr */
+		int i = 0;
 
-	strcpy(command, argv[i]);
-//	strcat(command, argv[i]);
-	strcat(command, " ");
-	i++;
-	do{
-		strcat(command, argv[i]);
+		strcpy(command, argv[i]);
+	//	strcat(command, argv[i]);
 		strcat(command, " ");
 		i++;
-	}while (argv[i] != NULL);
+		do {
+			strcat(command, argv[i]);
+			strcat(command, " ");
+			i++;
+		} while (argv[i] != NULL);
 
-	//Avoid output messages
-	strcat(command, " > /dev/null 2> /dev/null ");
+		//Avoid output messages
+		strcat(command, " > /dev/null 2> /dev/null ");
 
-	system(command);
+		system(command);
 
-	return 1;
-}
-
-/* Start a program as in:
- * echo "pipe_msg" | program [args...] */
-static inline int run_program_after_pipe(const char *pipe_msg, const char *file,
-							char *const argv[]){
-	int out, err; /* file descriptors for stdout and stderr */
-	int i;
-
-	strcpy(command, "echo ");
-	strcat(command, pipe_msg);
-	strcat(command, " | ");
-
-	i = 0;
-	do{
-		strcat(command, argv[i]);
-		strcat(command, " ");
-		i++;
-	}while (argv[i] != NULL);
-
-	//Avoid output messages
-	strcat(command, " > /dev/null 2> /dev/null ");
-
-	system(command);
-
-	return 1;
-}
-
-static inline int run_programs_with_pipe(int nprogs, char ***const argv_list,
-							const char *output_file)
-{
-	int oldpipe[2], newpipe[2];
-	int status;
-	int i;
-	int ret_value;
-	char **argv;
-
-	if (pipe(oldpipe) == -1) {
-		perror("Failed to create pipe");
-		return 0;
+		return 1;
 	}
 
-	ret_value = 1;
-	/* create first child */
-	switch(fork()) {
-		case -1:
-			perror("Fork failed to create process");
-			return 0;
+	/* Start a program as in:
+	 * echo "pipe_msg" | program [args...] */
+	static inline int run_program_after_pipe(const char *pipe_msg, const char *file,
+								char *const argv[]){
+		int out, err; /* file descriptors for stdout and stderr */
+		int i;
 
-		case 0:
-			/* 1st child process writes to oldpipe, reads from none */
-			close(oldpipe[0]);
-			dup2(oldpipe[1], 1);
+		strcpy(command, "echo ");
+		strcat(command, pipe_msg);
+		strcat(command, " | ");
 
-			argv = argv_list[0];
-			execv(argv[0], argv);
-			perror("Execv failed to run program");
-			_exit(EXIT_FAILURE);
+		i = 0;
+		do{
+			strcat(command, argv[i]);
+			strcat(command, " ");
+			i++;
+		}while (argv[i] != NULL);
+
+		//Avoid output messages
+		strcat(command, " > /dev/null 2> /dev/null ");
+
+		system(command);
+
+		return 1;
 	}
 
-	/* create intermediate children */
-	/* 1st child process already created, last one to be created later */
-	for (i = 1; i < nprogs-1; i++) {
-		if (pipe(newpipe) == -1) {
+	static inline int run_programs_with_pipe(int nprogs, char ***const argv_list,
+								const char *output_file)
+	{
+		int oldpipe[2], newpipe[2];
+		int status;
+		int i;
+		int ret_value;
+		char **argv;
+
+		if (pipe(oldpipe) == -1) {
 			perror("Failed to create pipe");
-			ret_value = 0;
-			goto end;
+			return 0;
 		}
 
-		switch (fork()) {
+		ret_value = 1;
+		/* create first child */
+		switch(fork()) {
+			case -1:
+				perror("Fork failed to create process");
+				return 0;
+
+			case 0:
+				/* 1st child process writes to oldpipe, reads from none */
+				close(oldpipe[0]);
+				dup2(oldpipe[1], 1);
+
+				argv = argv_list[0];
+				execv(argv[0], argv);
+				perror("Execv failed to run program");
+				_exit(EXIT_FAILURE);
+		}
+
+		/* create intermediate children */
+		/* 1st child process already created, last one to be created later */
+		for (i = 1; i < nprogs-1; i++) {
+			if (pipe(newpipe) == -1) {
+				perror("Failed to create pipe");
+				ret_value = 0;
+				goto end;
+			}
+
+			switch (fork()) {
+				case -1:
+					perror("Fork failed to create process");
+					ret_value = 0;
+					goto end;
+
+				case 0:
+					/* child reads from oldpipe, writes to newpipe */
+					close(oldpipe[1]);
+					close(newpipe[0]);
+					dup2(oldpipe[0], 0);
+					dup2(newpipe[1], 1);
+
+					argv = argv_list[i];
+					execv(argv[0], argv);
+					perror("Execv failed to run program");
+					_exit(EXIT_FAILURE);
+
+				default:
+					/* parent process */
+					close(oldpipe[0]);
+					close(oldpipe[1]);
+					oldpipe[0] = newpipe[0];
+					oldpipe[1] = newpipe[1];
+			}
+		}
+
+		/* create last child */
+		switch(fork()) {
 			case -1:
 				perror("Fork failed to create process");
 				ret_value = 0;
 				goto end;
 
 			case 0:
-				/* child reads from oldpipe, writes to newpipe */
+				/* last child process reads from oldpipe, maybe writes to file */
 				close(oldpipe[1]);
-				close(newpipe[0]);
 				dup2(oldpipe[0], 0);
-				dup2(newpipe[1], 1);
 
-				argv = argv_list[i];
+				if (output_file != NULL) {
+					int outfd;
+
+					outfd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC,
+							S_IRUSR | S_IWUSR | S_IRGRP);
+					if (outfd == -1) {
+						perror("Error opening output file");
+						_exit(EXIT_FAILURE);
+					}
+					dup2(outfd, 1);
+				}
+
+				argv = argv_list[nprogs-1];
 				execv(argv[0], argv);
 				perror("Execv failed to run program");
 				_exit(EXIT_FAILURE);
-
-			default:
-				/* parent process */
-				close(oldpipe[0]);
-				close(oldpipe[1]);
-				oldpipe[0] = newpipe[0];
-				oldpipe[1] = newpipe[1];
 		}
+
+		close(oldpipe[0]);
+		close(oldpipe[1]);
+
+		end:
+		for (; i >= 0; i--) /* wait for all the created children processes */
+			wait(&status);
+
+		return ret_value;
 	}
-
-	/* create last child */
-	switch(fork()) {
-		case -1:
-			perror("Fork failed to create process");
-			ret_value = 0;
-			goto end;
-
-		case 0:
-			/* last child process reads from oldpipe, maybe writes to file */
-			close(oldpipe[1]);
-			dup2(oldpipe[0], 0);
-
-			if (output_file != NULL) {
-				int outfd;
-
-				outfd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC,
-						S_IRUSR | S_IWUSR | S_IRGRP);
-				if (outfd == -1) {
-					perror("Error opening output file");
-					_exit(EXIT_FAILURE);
-				}
-				dup2(outfd, 1);
-			}
-
-			argv = argv_list[nprogs-1];
-			execv(argv[0], argv);
-			perror("Execv failed to run program");
-			_exit(EXIT_FAILURE);
-	}
-
-	close(oldpipe[0]);
-	close(oldpipe[1]);
-
-	end:
-	for (; i >= 0; i--) /* wait for all the created children processes */
-		wait(&status);
-
-	return ret_value;
-}
 #endif
 
 void initialize_g_sas_values(){
@@ -838,7 +811,7 @@ void call_mdrun2energy(const char *pdbfile, const char *local_execute,
 }
 #endif
 
-#ifdef linux
+#ifdef __unix__
 /** runs g_gyrate program and evaluates the radius of gyration of the protein
  * based on alpha-carbons only
  */
@@ -1191,7 +1164,7 @@ void compute_energy_GBSA(solution_t *sol, const int *obj, const char *local_exec
 }
 #endif
 
-#ifdef linux
+#ifdef __unix__
 void call_g_energy(const char *local_execute, const char *path_gromacs_programs,
 	const char *opt_energy){
 
@@ -1555,7 +1528,7 @@ void compute_hbond_main(solution_t *sol, const int *fit, const char *local_execu
 }
 #endif
 
-#ifdef linux
+#ifdef __unix__
 /** runs g_sas program to calculate hydrophobic, hydrophilic and total
 * solvent accessible surface area.
 * See Eisenhaber F, Lijnzaad P, Argos P, Sander C, & Scharf M (1995) J. Comput. Chem. 16, 273-284.
@@ -1939,7 +1912,7 @@ void get_gromacs_objectives_of_solution(solution_t *solution,
 }
 #endif
 
-#ifdef linux
+#ifdef __unix__
 /** Calculates the objectives by GROMACS
 */
 void get_gromacs_objectives(solution_t *solutions, const input_parameters_t *in_para){
